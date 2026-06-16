@@ -1,0 +1,23 @@
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "urisysedge"
+version = "0.1.0"
+description = "Shared URI edge runtime for urisys capability packs"
+readme = "README.md"
+requires-python = ">=3.10"
+license = "Apache-2.0"
+authors = [{ name = "urisys contributors" }, { name = "Tom Sapletta", email = "tom@sapletta.com" }]
+keywords = ["uri", "urisys", "urisysedge"]
+
+[project.optional-dependencies]
+dev = ["pytest>=8.0", "goal>=2.1.0"]
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["urisysedge*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
