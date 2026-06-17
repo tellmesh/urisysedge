@@ -15,14 +15,20 @@ Generated on 2026-06-16 using [openrouter/qwen/qwen3-coder-next](https://openrou
 
 
 
-Canonical edge runtime for URI capability packs: `Route`, `Runtime`, `JsonlEventStore`, `run_flow`.
+Canonical edge runtime for URI capability packs: `Route`, `Runtime`, `JsonlEventStore`, `run_flow`, `http.serve`.
 
-Used by `urisys-node`, `urikvm`, `urirdp-docker`, and lab stacks. Install this before any `kvm://` / `him://` pack when not using the full `urisys` monorepo checkout.
+Used by `urisys-node`, standalone packs, and edge CLIs:
+
+| CLI | Repo | Port |
+|-----|------|------|
+| `urisys-rdp` | `urirdpedge` | 8795 |
+| `urisys-kvm` | `urikvmedge` | 8794 |
+| `uristepper-edge` | `uristepperedge` | 8790 |
 
 ```bash
 pip install urisysedge
 # monorepo dev:
-pip install -e packages/python/urisysedge
+pip install -e tellmesh/urisysedge
 ```
 
 

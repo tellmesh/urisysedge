@@ -11,9 +11,16 @@ requires-python = ">=3.10"
 license = "Apache-2.0"
 authors = [{ name = "urisys contributors" }, { name = "Tom Sapletta", email = "tom@sapletta.com" }]
 keywords = ["uri", "urisys", "urisysedge"]
+# uricore (module ``uri_control``) is the single source of truth for URI
+# routing. It is optional at import time (the runtime falls back to its local
+# implementation when absent) but declared here so edge environments converge
+# on the shared engine.
+dependencies = ["PyYAML>=6.0", "uricore>=0.1.8"]
 
 [project.optional-dependencies]
-dev = ["pytest>=8.0", "goal>=2.1.0",
+dev = [
+    "pytest>=8.0",
+    "goal>=2.1.0",
     "costs>=0.1.20",
     "pfix>=0.1.60",
 ]

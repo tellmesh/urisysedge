@@ -3189,6 +3189,9 @@ wheels = [
 name = "urisysedge"
 version = "0.1.1"
 source = { editable = "." }
+dependencies = [
+    { name = "pyyaml" },
+]
 
 [package.optional-dependencies]
 dev = [
@@ -3204,6 +3207,7 @@ requires-dist = [
     { name = "goal", marker = "extra == 'dev'", specifier = ">=2.1.0" },
     { name = "pfix", marker = "extra == 'dev'", specifier = ">=0.1.60" },
     { name = "pytest", marker = "extra == 'dev'", specifier = ">=8.0" },
+    { name = "pyyaml", specifier = ">=6.0" },
 ]
 provides-extras = ["dev"]
 

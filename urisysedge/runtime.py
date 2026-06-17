@@ -6,12 +6,23 @@ import re
 import time
 import uuid
 from dataclasses import dataclass
-from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from typing import Any, Callable
 from urllib.parse import unquote
 
 from .env import load_env_policy
+
+# Surgical delegation to the uricore engine (the single source of truth for URI
+# routing). When ``uricore`` (module ``uri_control``) is installed, route
+# storage + pattern matching are delegated to its CapabilityRegistry, killing
+# the duplicate regex compiler. When it is absent, the local implementation
+# below is used unchanged, so existing edge deployments never break.
+try:  # pragma: no cover - exercised by environment, not unit tests
+    from uri_control import CapabilityRegistry as _UriCoreRegistry
+    from uri_control.errors import RouteNotFoundError as _UriCoreRouteNotFound
+except Exception:  # uricore not installed in this environment
+    _UriCoreRegistry = None  # type: ignore[assignment]
+    _UriCoreRouteNotFound = Exception  # type: ignore[assignment,misc]
 
 
 def _result_ok(result: Any) -> bool:
@@ -86,10 +97,15 @@ class JsonlEventStore:
 
 class Runtime:
     def __init__(self, events_path: str | Path = "data/events.jsonl", config: dict[str, Any] | None = None):
+        # ``self.routes`` is always populated (local Route objects) so that
+        # ``/uri/routes``, ``serve()`` and inspection behave identically in both
+        # modes. When uricore is available, ``self._registry`` additionally holds
+        # the same routes and drives matching.
         self.routes: list[Route] = []
         self.events = JsonlEventStore(events_path)
         self.config = config or {}
         self.state: dict[str, Any] = {}
+        self._registry = _UriCoreRegistry() if _UriCoreRegistry is not None else None
 
     def register(
         self,
@@ -103,8 +119,36 @@ class Runtime:
     ) -> None:
         op = operation or pattern.rsplit("/", 1)[-1]
         self.routes.append(Route(pattern, kind, op, handler, approval, side_effects).compile())
+        if self._registry is not None:
+            self._registry.register(
+                pattern,
+                handler,
+                kind=kind,
+                operation=op,
+                approval=approval,
+                side_effects=side_effects,
+            )
 
     def resolve(self, uri: str) -> tuple[Route, dict[str, str]]:
+        if self._registry is not None:
+            # Delegate matching to the uricore engine (pure routing, no handler
+            # load — this runtime loads handlers lazily itself in call()).
+            try:
+                matched = self._registry.match_route(uri)
+            except _UriCoreRouteNotFound:
+                raise KeyError(f"No route for URI: {uri}")
+            core = matched.route
+            # Adapt the uricore Route to this runtime's local Route shape so the
+            # rest of call() (approval, events, handler load) is unchanged.
+            route = Route(
+                pattern=core.pattern,
+                kind=core.kind,
+                operation=core.operation,
+                handler_ref=core.handler_ref,
+                approval=core.approval,
+                side_effects=core.side_effects,
+            )
+            return route, dict(matched.variables)
         for route in self.routes:
             params = route.match(uri)
             if params is not None:
@@ -232,39 +276,15 @@ def run_flow(runtime: Runtime, path: str, context: dict[str, Any] | None = None)
     return results
 
 
+# HTTP transport now lives in urisysedge.http (the single shared implementation).
+# These thin wrappers preserve the historical urisysedge entry points so callers
+# and edge shims keep working unchanged.
+from .http import make_uri_handler, serve as _serve  # noqa: E402
+
+
 def make_handler(runtime: Runtime):
-    class Handler(BaseHTTPRequestHandler):
-        def _json(self, status: int, data: dict[str, Any]) -> None:
-            raw = json.dumps(data, ensure_ascii=False).encode("utf-8")
-            self.send_response(status)
-            self.send_header("Content-Type", "application/json; charset=utf-8")
-            self.send_header("Content-Length", str(len(raw)))
-            self.end_headers()
-            self.wfile.write(raw)
-
-        def do_GET(self):
-            if self.path == "/health":
-                return self._json(200, {"ok": True, "service": "urirdp", "runtime": "urisys-edge"})
-            if self.path == "/uri/routes":
-                return self._json(200, {"ok": True, "routes": [r.pattern for r in runtime.routes]})
-            return self._json(404, {"ok": False, "error": "not found"})
-
-        def do_POST(self):
-            if self.path != "/uri/call":
-                return self._json(404, {"ok": False, "error": "not found"})
-            length = int(self.headers.get("Content-Length") or "0")
-            body = self.rfile.read(length).decode("utf-8")
-            req = json.loads(body or "{}")
-            result = runtime.call(req.get("uri", ""), req.get("payload") or {}, req.get("context") or {})
-            return self._json(200 if result.get("ok") else 400, result)
-
-    return Handler
+    return make_uri_handler(runtime, service="urirdp")
 
 
 def serve(runtime: Runtime, host: str, port: int) -> None:
-    server = ThreadingHTTPServer((host, port), make_handler(runtime))
-    print(f"urirdp/urisys-edge listening on http://{host}:{port}")
-    print("routes:")
-    for r in runtime.routes:
-        print(" -", r.pattern)
-    server.serve_forever()
+    _serve(runtime, host, port, service="urirdp")
