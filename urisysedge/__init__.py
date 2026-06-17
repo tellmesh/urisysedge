@@ -1,14 +1,22 @@
-"""Shared URI edge runtime for urisys lab images, urisys-node, and Docker stacks."""
+"""Shared URI edge runtime for urisys lab images, urisys-node, and Docker stacks.
 
-from .compose import (
+Shim re-exporting ``uri_control.edge`` — the canonical location.
+"""
+
+from uri_control.edge import (
+    JsonlEventStore,
+    Route,
+    Runtime,
     bundle_packs,
     build_runtime,
+    load_json,
+    load_yaml_flow,
     register_manifests,
     register_pack,
     register_packs,
     resolve_pack_module,
+    run_flow,
 )
-from .runtime import JsonlEventStore, Route, Runtime, load_json, load_yaml_flow, run_flow
 
 __all__ = [
     "JsonlEventStore",
