@@ -156,6 +156,15 @@ class Runtime:
         raise KeyError(f"No route for URI: {uri}")
 
     def _load_handler(self, ref: str) -> Callable[[dict[str, Any], dict[str, Any]], dict[str, Any]]:
+        # Delegate to the uricore multi-technology loader (python/http/https/node)
+        # when available, so the same edge runtime can serve URIs backed by any
+        # technology behind the HTTP wire ABI. Fall back to in-process python://.
+        try:
+            from uri_control.handlers import load_handler
+        except Exception:
+            load_handler = None
+        if load_handler is not None:
+            return load_handler(ref)
         if ref.startswith("python://"):
             ref = ref[len("python://"):]
         module_name, func_name = ref.split(":", 1)
