@@ -14,6 +14,7 @@ def test_resolve_pack_module_default_and_alias():
     assert compose.resolve_pack_module("him") == "urihim"
     assert compose.resolve_pack_module("uristepper") == "uristepper"  # already prefixed
     assert compose.resolve_pack_module("browser") == "uribrowserdocker"  # default exception
+    assert compose.resolve_pack_module("tts") == "uristt"
     assert compose.resolve_pack_module("kvm", {"kvm": "urikvm_x"}) == "urikvm_x"
 
 
